@@ -1,0 +1,7 @@
+/.vscode
+/build
+CMakeLists.txt
+example_test.py
+sdkconfig
+sdkconfig.ci
+sdkconfig.old
