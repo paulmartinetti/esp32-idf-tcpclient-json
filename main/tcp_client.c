@@ -35,8 +35,9 @@
 
 static const char *TAG = "example";
 static const char *payload = "Message from ESP32 ";
+char rx_buffer[256];
 
-void parse_json(const char * const filename) {
+static void parse_json(void *pvParameters) {
 
     const cJSON *id = NULL;
     const cJSON *nom = NULL;
@@ -50,19 +51,19 @@ void parse_json(const char * const filename) {
     const cJSON *pulseWire = NULL;
     const cJSON *retractWire = NULL;
 
-    cJSON *parsed_json = cJSON_Parse(filename);
+    cJSON *parsed_json = cJSON_Parse(rx_buffer);
 
     nom = cJSON_GetObjectItemCaseSensitive(parsed_json, "nom");
-    if (cJSON_IsString(nom) && (nom->valuestring != NULL))
-    {
-        //printf("Checking projet \"%s\"\n", nom->valuestring);
+    if (cJSON_IsString(nom) && (nom->valuestring != NULL)) {
         ESP_LOGI(TAG, "%s", nom->valuestring);
     }
+
+    vTaskDelete(NULL);
 }
 
 static void tcp_client_task(void *pvParameters)
 {
-    char rx_buffer[256];
+    //char rx_buffer[256];
     char host_ip[] = HOST_IP_ADDR;
     int addr_family = 0;
     int ip_protocol = 0;
@@ -126,8 +127,9 @@ static void tcp_client_task(void *pvParameters)
                 rx_buffer[len] = 0; // Null-terminate whatever we received and treat like a string
                 ESP_LOGI(TAG, "Received %d bytes from %s:", len, host_ip);
                 ESP_LOGI(TAG, "%s", rx_buffer);
-
-                parse_json(rx_buffer);
+                
+                xTaskCreate(parse_json, "parse_json", 2048, NULL, 6, NULL);
+                vTaskDelete(NULL);
             }
 
             vTaskDelay(2000 / portTICK_PERIOD_MS);
@@ -140,7 +142,7 @@ static void tcp_client_task(void *pvParameters)
             close(sock);
         }
     }
-    vTaskDelete(NULL);
+    //vTaskDelete(NULL);
     //
 }
 
@@ -155,8 +157,10 @@ void app_main(void)
      * examples/protocols/README.md for more information about this function.
      */
     ESP_ERROR_CHECK(example_connect());
-
-    xTaskCreate(tcp_client_task, "tcp_client", 4096, NULL, 5, NULL);
+    // 4096 = usStackDepth value of 4K bytes stack allocated by the kernel
+    // 5 = uxPriority value or priority of the task, not sure why 5
+    xTaskCreate(tcp_client_task, "tcp_client", 2048, NULL, 5, NULL);
+    
 
     ESP_LOGI(TAG, "Hi from the bottom of app_main");
 }
